@@ -1,28 +1,72 @@
-name: Deploy to GitHub Pages
+# Nama workflow yang akan muncul di tab Actions
+name: Deploy Static Website
 
+# Tentukan kapan workflow ini akan dijalankan
 on:
+  # Ketika ada push ke branch main
   push:
     branches: [ main ]
     paths:
       - 'index.html'
+      - '**.js'
+      - '**.css'
+  # Memungkinkan workflow dijalankan secara manual
+  workflow_dispatch:
+
+# Mengatur permission
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Hanya izinkan satu deployment berjalan pada satu waktu
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Optional: Setup Node.js jika Anda menggunakan npm packages
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Optional: Install dependencies jika Anda memiliki package.json
+      # - name: Install dependencies
+      #   run: npm ci
+
+      # Optional: Run tests jika Anda memiliki test scripts
+      # - name: Run tests
+      #   run: npm test
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v4
         
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
         with:
-          path: '.'
-          
+          source: ./
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/deploy-pages@v4
